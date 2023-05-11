@@ -1,0 +1,92 @@
+---
+title: "Example of use of the functions for parsing pubmed records"
+output: html_document
+author: "juarpasi"
+date: "2023-05-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(DT)
+```
+
+# Introduction
+This vignette show how to use the `getMetadata` function in one PubMed record.
+
+# Preparation
+
+If you have a _entrez key_ you can save it in the variable `ENTREZ_KEY`.
+For this example I will use the `easyPubMed` package to get one article.
+```{r, warning = F, message = F}
+# put below your own entrez key if you have one
+ENTREZ_KEY=NULL
+library(easyPubMed)
+library(xml2)
+
+#copy the funcitons in your working directory and export them.
+#if you have the functions in other place, you need to specify the path
+source('getMetadata.R')
+source('getAuthors.R')
+source('makeDfFromXmlTxt.R')
+source('nodeList2Df.R')
+```
+To make the functions work, we need to use the `xml2` package.
+
+Next, we need at least one PubMed record.
+```{r, warning = F, message = F}
+query <- 'cancer[TI] AND "2020"[dp] AND "journal article"[pt] AND "free full text"[sb] AND adolescent[mh]'
+
+search <- get_pubmed_ids(query, api_key = ENTREZ_KEY)
+
+oneRecordCancer2020 <- fetch_pubmed_data(search, retmax = 1)
+
+doc <- xml2::read_xml(oneRecordCancer2020)|>
+  xml2::xml_find_all(".//PubmedArticle")
+```
+
+The `oneRecordCancer2020` object contains one PubMed record.
+This record will be used for parsing.
+But first, we need to convert it into a `xml2` document since the `getMetadata` function work with this object.
+
+# Parse the PubMed record
+To extract the abstract, we place it in the `metadata.list` argument.
+```{r, warning = F, message = F}
+recordAbs <-
+  getMetadata(doc, metadata.list = 'abstract')
+```
+
+```{r,warning = F, message = F}
+datatable(recordAbs[["abstract"]])
+```
+
+You can specify other metadata fields if you are interested in them.
+```{r,warning = F, message = F}
+recordMetadata <-
+  getMetadata(doc,
+              metadata.list = c('keywordTerms','journal'))
+```
+
+```{r,warning = F, message = F}
+datatable(recordMetadata$keywordTerms)
+datatable(recordMetadata$journal)
+```
+
+Currently, the available metadata fields that can be parsed in the `metadata.list` argument are the follows:
+
+* abstract
+* meshDescrip
+* meshQualifier
+* keywordTerms
+* pubType
+* journal
+* country
+* language
+* title
+* year
+* authors
+
+Due to the structure of the PubMed record, each metadata field requires one of the following functions `getAuthors.R`, `makeDfFromXmlTxt` or `nodeList2Df`.
+
+```{r, echo=FALSE}
+sessionInfo()
+```

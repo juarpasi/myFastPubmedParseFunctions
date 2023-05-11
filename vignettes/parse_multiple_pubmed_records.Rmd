@@ -1,0 +1,187 @@
+---
+title: "How to parsed multiple PubMed records"
+output: html_document
+author: "juarpasi"
+date: "2023-05-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(DT)
+```
+
+# Introduction
+The `getMetadata` function works well with one PubMed record.
+However, there are cases where we need to parse multiple records
+
+# Preparation
+
+If you have a _entrez key_ you can save it in the variable `ENTREZ_KEY`.
+For this example I will use the `easyPubMed` package to retrieve the articles.
+```{r, warning = F, message = F}
+# put below your own entrez key if you have one
+ENTREZ_KEY=NULL
+library(easyPubMed)
+library(xml2)
+library(dplyr)
+```
+To make the functions work, we need to use the `xml2` package.
+
+# Get pubmed records
+Next, we will download approximately 1500 PubMed record.
+```{r}
+query <- '"breast neoplasms, male"[MeSH Terms] AND "journal article"[pt] AND ("2010"[dp]:"2022"[dp])'
+
+#download the records in the working directory
+batch_pubmed_download(query,
+                      #dest_dir = 'data',
+                      dest_file_prefix = paste0("maleCancer_"),
+                      format = "xml", api_key = ENTREZ_KEY,
+                      batch_size = 400)
+```
+
+In this case, the records are saved in `.txt` files.
+We need to read them into the `R` environment.
+Additionally, we also need to use others packages to parallelize the work.
+
+```{r, warning = F, message = F}
+library(XML)
+library(xml2)
+library(foreach)
+library(doParallel)
+library(ggplot2)
+
+#copy the funcitons in your working directory and export them.
+#if you have the function in other place, you need to specify the path
+source('getMetadata.R')
+#a simple function for read the files with pubmeds records
+source('readXML.R')
+```
+
+# Parse metadata
+```{r, warning = F, message = F}
+files <- dir(pattern = 'maleCancer*')
+files <- lapply(files, readXMLPubmed)|> Reduce(c, x= _)
+
+###########################################
+cl <- makeCluster(detectCores() - 1)
+registerDoParallel(cl)
+
+# We use the foreach pkg to iterate on the nodeset and call the function
+metadata <- foreach(file = files, .packages = c("xml2")) %dopar% {
+  
+  source('getAuthors.R')
+  source('makeDfFromXmlTxt.R')
+  source('nodeList2Df.R')
+
+  doc <- xml2::read_xml(file)
+  r <- getMetadata(doc,
+                   metadata.list = c('meshDescrip','meshQualifier','journal','year'))
+  return(r)
+}
+
+stopCluster(cl)
+###########################################
+
+#clean memory
+rm(cl)
+rm(files)
+gc()
+```
+
+# Make some analysis
+Now, the `metadata` object is a list that contains the metadata for each record obtained.
+We can use the `data.table` package to get a dataframe for each data.
+
+We can start to make some analysis on the metadata.
+For example, we can create a histogram showing the publication years.
+```{r, warning = F, message = F}
+years <- lapply(metadata, `[[`, 'year') |> data.table::rbindlist(fill=TRUE)
+
+papersYearsPlot <-
+  years |>
+  as_tibble() |>
+  count(Year) |>
+  arrange() |>
+  mutate(across(Year, as.integer)) |>
+  ggplot() + 
+  geom_col(aes(x = Year, y = n), fill = '#4271AE')+
+  labs(x = 'year',
+       y = 'N of arcticles',
+       title = 'Papers of male cancer') +
+  theme(plot.title = element_text(face = "bold"),
+        panel.border = element_rect(color = "black", fill=NA, size = 0.8),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "transparent",colour = NA),
+        plot.background = element_rect(fill = "transparent",colour = NA),
+        axis.text.x = element_text(angle = -90, vjust = 0.5))
+
+papersYearsPlot
+```
+
+Which are the main journals that publish related to the query?
+```{r, warning = F, message = F}
+library(tidyr)
+journals <- lapply(metadata, `[[`, 'journal') |> data.table::rbindlist(fill=TRUE)
+
+journalsTbl <-
+  journals |>
+  select(Title) |>
+  drop_na() |>
+  count(Title) |>
+  slice_max(n, n = 20) |>
+  arrange(desc(n))
+
+datatable(journalsTbl)
+```
+
+What are the most frequent MeSH terms in the records?
+```{r, warning = F, message = F}
+library(forcats)
+
+meshD <- lapply(metadata, `[[`, 'meshDescrip') |> data.table::rbindlist(fill=TRUE)
+meshQ <- lapply(metadata, `[[`, 'meshDescrip') |> data.table::rbindlist(fill=TRUE)
+
+meshD$Type <- NULL
+meshD <-
+  meshD |>
+  select(id, text) |>
+  mutate(type = 'descriptor')
+
+meshQ <-
+  meshQ |>
+  select(id, text) |>
+  mutate(type = 'qualifiers')
+
+mesh <-
+  data.table::rbindlist(list(meshD,meshQ))
+
+meshFreqPlot <-
+  mesh |>
+  drop_na() |>
+  count(text, type) |>
+  arrange(desc(n))|>
+  slice_max(order_by = n, n = 25) |>
+  mutate(meshes = fct_reorder(text, n)) |>
+  ggplot() +
+  geom_col(aes(x = n, y = meshes, fill = type)#,fill = 'red'
+           )+
+  labs(x = 'Mesh Terms',
+       y = '',
+       title = 'Most common mesh terms') +
+  theme(plot.title = element_text(face = "bold"),
+        panel.border = element_rect(color = "black", fill=NA, size = 0.8),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "transparent",colour = NA),
+        plot.background = element_rect(fill = "transparent",colour = NA),
+        axis.text.x = element_text(angle = -90, vjust = 0.5))
+
+meshFreqPlot
+```
+
+
+```{r, echo=FALSE}
+sessionInfo()
+```
