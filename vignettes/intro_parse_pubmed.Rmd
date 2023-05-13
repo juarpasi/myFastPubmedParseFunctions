@@ -1,19 +1,21 @@
 ---
-title: "Example of use of the functions for parsing pubmed records"
-output: html_document
+title: "Example: Parsing PubMed Records Using Custom Functions"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
 author: "juarpasi"
 date: "2023-05-11"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(DT)
 ```
 
-# Introduction
+## Introduction
 This vignette show how to use the `getMetadata` function in one PubMed record.
 
-# Preparation
+## Preparation
 
 If you have a _entrez key_ you can save it in the variable `ENTREZ_KEY`.
 For this example I will use the `easyPubMed` package to get one article.
@@ -48,7 +50,7 @@ The `oneRecordCancer2020` object contains one PubMed record.
 This record will be used for parsing.
 But first, we need to convert it into a `xml2` document since the `getMetadata` function work with this object.
 
-# Parse the PubMed record
+## Parse the PubMed record
 To extract the abstract, we place it in the `metadata.list` argument.
 ```{r, warning = F, message = F}
 recordAbs <-
@@ -56,7 +58,7 @@ recordAbs <-
 ```
 
 ```{r,warning = F, message = F}
-datatable(recordAbs[["abstract"]])
+knitr::kable(recordAbs[["abstract"]])
 ```
 
 You can specify other metadata fields if you are interested in them.
@@ -67,8 +69,11 @@ recordMetadata <-
 ```
 
 ```{r,warning = F, message = F}
-datatable(recordMetadata$keywordTerms)
-datatable(recordMetadata$journal)
+knitr::kable(recordMetadata$keywordTerms)
+```
+
+```{r,warning = F, message = F}
+knitr::kable(recordMetadata$journal)
 ```
 
 Currently, the available metadata fields that can be parsed in the `metadata.list` argument are the follows:
