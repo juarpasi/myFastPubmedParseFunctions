@@ -6,7 +6,7 @@
 #' If the record has no author return NULL
 #' 
 #' @param doc A xml document
-#' @param id NULL (by default). A id of the doc
+#' @param id NULL (by default). The id of the doc
 #' @return A dataframe with the forename, lastName, Initial and affiliation.
 #'
 #' @export
@@ -18,9 +18,7 @@ getAuthors <- function(doc, id = NULL) {
     xml_find_all(xpath = './/AuthorList//Author')
   doc <- NULL
   
-  if (length(authors) == 0) {
-    return(NULL)
-  }
+  if (length(authors) == 0) return(NULL)
   
   df <- data.frame(LastName = character(), ForeName = character(),
                    Initials = character(), Affiliation = character())
@@ -42,7 +40,7 @@ getAuthors <- function(doc, id = NULL) {
     df <- rbind(df, new_df)
   }
   
-  df['PMID'] <- id
+  df['id'] <- id
   authors <- NULL
   
   return(df)

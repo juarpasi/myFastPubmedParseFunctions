@@ -1,9 +1,9 @@
-#' a fn for make a df from a doc with attr and text
+#' a fn to make a df from a doc with attr and text
 #'
 #' @description
 #' This function take a list of text nodes and make a dataframe with its attributes
 #' 
-#' This also accept a id
+#' This also accept an id
 #' 
 #' @param doc A xml document
 #' @param xpath chr vect. the path of the nodes
@@ -45,9 +45,7 @@ nodeList2Df <- function(doc, xpath, id = NA, attribs = NULL) {
   nodes <- doc |>
   xml_find_all(xpath)
   
-  if (length(nodes) == 0) {
-    return(NULL)
-  }
+  if (length(nodes) == 0) return(NULL)
   
   #get text
   df <- data.frame(text = xml2::xml_text(nodes))

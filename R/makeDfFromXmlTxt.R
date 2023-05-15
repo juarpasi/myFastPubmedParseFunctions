@@ -1,7 +1,7 @@
 #' Convert a node of a xml doc into a dataframe
 #'
 #' @description
-#' find a node and then use its name as a variable for the df, and the text for the value.
+#' Find a node and then use its name as a variable for the df, and the text for the value.
 #' 
 #' This also accept a id
 #' 

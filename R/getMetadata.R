@@ -1,9 +1,9 @@
-#' Read a xml pubmed file into chr strings
+#' Extract the metadata from a PubMed record
 #'
 #' @description
-#' Split the xml doc into one 
+#' A fast way of parsing metadata from a PubMed record.
 #' 
-#' This also accept a id
+#' The record has to be as a xml doc. Thus you need the `xml2` package.
 #' 
 #' @param doc A xml document
 #' @param metadata.list chr vect. the metadata that one want to retrieve. Posibly:
@@ -18,7 +18,7 @@
 #' * title
 #' * year
 #' * authors
-#' @return A list. With the elements named with the metadata
+#' @return A list. Each element is a record, each record contains a list with the metadata
 #'
 #' @examples
 #' # Chop ----------------------------------------------------------------------
@@ -85,19 +85,25 @@ getMetadata <- function(doc, metadata.list = NULL) {
   for (i in 1:length(metadataFunctions$metadataNames)) {
     #add the doc and the id to the options of the functions
     metadataFunctions$opts[[i]] <- c(list(doc),metadataFunctions$opts[[i]], list(id))
+    #to do: add the attr when calling nodeList2Df
   }
   
-  metadaRes <- Map(function(fun, options)
-    #call the function
-    do.call(fun,options, envir = globalenv()),
-    #the funciton and the options
-    metadataFunctions$functions, metadataFunctions$opts)
+  metadaRes <-
+    Map(
+      function(fun, options)
+        #call the function
+        do.call(fun,options, envir = globalenv()),
+        #the funciton and the options
+        metadataFunctions$functions, metadataFunctions$opts
+      )
   
   names(metadaRes) <- metadataFunctions$metadataNames
   
   doc <- NULL
 
-  metadaRes <- metadaRes #|> dropNullElementOfList()
+  metadaRes <- metadaRes #|>
+  ##add a function that drop a NULL element from a list
+  #dropNullElementOfList()
   
   return(metadaRes)
 }
