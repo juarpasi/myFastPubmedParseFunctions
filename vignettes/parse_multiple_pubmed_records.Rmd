@@ -25,11 +25,11 @@ This tutorial shows how can we extract the metadata from multiple PubMed records
 
 If you have a _entrez key_ you can save it in the variable `ENTREZ_KEY`.
 ```{r, warning = F, message = F}
-# put below your own entrez key if you have one
 ENTREZ_KEY=NULL
 library(easyPubMed)
 library(xml2)
 library(dplyr)
+library(XML)
 ```
 
 ## Get pubmed records
@@ -46,68 +46,53 @@ batch_pubmed_download(query,
 
 In this case, the records are saved in `.txt` files.
 We need to read them into the `R` environment.
-The `readXMLPubmed` function in the `readXML.R` _script_ read one file containing the PubMeds Records.
-
-Additionally, we also need to use others packages to parallelize the work.
+The `readXMLPubmed` function in the `readXML.R` _script_ read one file containing the PubMed Records.
 
 ```{r, warning = F, message = F}
-library(XML)
-library(foreach)
-library(doParallel)
-
 #copy the funcitons in your working directory and export them.
 #if you have the function in other place, you need to specify the path
 source('getMetadata.R')
 source('readXML.R')
+source('getAuthors.R')
+source('makeDfFromXmlTxt.R')
+source('nodeList2Df.R')
 ```
 
 ## Parse metadata
+Since we are working with multiple records, we use the `lapply` function with the `getMetadata`.
 ```{r, warning = F, message = F, results='hide'}
 files <- dir(pattern = 'maleCancer*')
 files <- lapply(files, readXMLPubmed)|> Reduce(c, x= _)
+files <- lapply(files, read_xml)
 
-###########################################
-cl <- makeCluster(detectCores() - 1)
-registerDoParallel(cl)
+metadata <- lapply(files, getMetadata, metadata.list = c('meshDescrip','meshQualifier','journal','year'))
 
-# We use the foreach pkg to iterate on the nodeset and call the function
-metadata <- foreach(file = files, .packages = c("xml2")) %dopar% {
-  
-  #call the functions
-  source('getAuthors.R')
-  source('makeDfFromXmlTxt.R')
-  source('nodeList2Df.R')
-
-  dat <-
-    xml2::read_xml(file) |>
-    getMetadata(
-      #add the metada you want to obtain
-      metadata.list = c('meshDescrip','meshQualifier','journal','year'))
-  
-  return(dat)
-}
-
-stopCluster(cl)
-###########################################
-
-#clean memory
-rm(cl)
 rm(files)
 gc()
 ```
 
-# Metada Anlysis
-
-## Convert list into a dataframe
+## Convert metadata list into a dataframe
 Now, the `metadata` object is a list that contains the metadata for each record obtained.
-We can use the `data.table` package to get a dataframe for each data.
+
+```{r, warning = F, message = F}
+str(metadata[[1]])
+```
+
+I prefer to use a dataframe, so we can work with the tidyverse packages.
+We can use the `rbindlist` function to combine the data into a single dataframe.
+
+```{r, warning = F, message = F}
+years <- lapply(metadata, `[[`, 'year') |> data.table::rbindlist(fill=TRUE)
+knitr::kable(head(years))
+```
+
+# Metada Anlysis
 
 ## Paper per year
 We can start to make some analysis on the metadata.
 For example, we can create a histogram showing the publication years.
 ```{r, warning = F, message = F}
 library(ggplot2)
-years <- lapply(metadata, `[[`, 'year') |> data.table::rbindlist(fill=TRUE)
 
 papersYearsPlot <-
   years |>
@@ -193,6 +178,7 @@ meshFreqPlot <-
 meshFreqPlot
 ```
 
+As specified in the [Example: Parsing PubMed Records Using Custom Functions](https://example.com) vignette, you can currently parse the following metadata by placing in the `metadata.list` argument of the `getMetadata` function: `abstract`, `meshDescrip`, `meshQualifier`, `keywordTerms`, `pubType`, `journal`, `country`, `language`, `title`, `year` and `authors`.
 
 ```{r, echo=FALSE}
 sessionInfo()
